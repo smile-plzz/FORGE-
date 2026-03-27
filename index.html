@@ -999,7 +999,7 @@ const state = {
   title: '',
   channel: '',
   durationSec: 0,
-  type: 'video',       // 'video' | 'audio'
+  type: 'video', // 'video' | 'audio'
   fmt: 'mp4',
   quality: 'best',
   audioFmt: 'mp3',
@@ -1010,14 +1010,13 @@ const state = {
   flags: {mute:false, hdr:false, merge:true, thumb:false, meta:false}
 };
 
-// ─── URL INPUT ────────────────────────────────────────────────────────────────
+// ─── URL INPUT & DRAG/DROP ───────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
     document.getElementById('urlInput').focus();
   }
 });
 
-// Drag-over zone
 const dropZone = document.getElementById('dropZone');
 document.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
 document.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
@@ -1025,7 +1024,10 @@ document.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
   const text = e.dataTransfer.getData('text');
-  if (text) { document.getElementById('urlInput').value = text; loadVideo(); }
+  if (text) {
+    document.getElementById('urlInput').value = text;
+    loadVideo();
+  }
 });
 
 document.getElementById('pasteBtn').onclick = async () => {
@@ -1033,7 +1035,9 @@ document.getElementById('pasteBtn').onclick = async () => {
     const text = await navigator.clipboard.readText();
     document.getElementById('urlInput').value = text;
     loadVideo();
-  } catch { log('Clipboard access denied — paste manually', 'err'); }
+  } catch {
+    log('Clipboard access denied — paste manually', 'err');
+  }
 };
 
 document.getElementById('urlInput').addEventListener('keydown', e => {
@@ -1054,35 +1058,34 @@ async function loadVideo() {
   if (!url) return;
 
   const vid = extractVideoId(url);
-  if (!vid) { log('Invalid YouTube URL', 'err'); shakeInput(); return; }
+  if (!vid) {
+    log('Invalid YouTube URL', 'err');
+    shakeInput();
+    return;
+  }
 
   state.url = url;
   state.videoId = vid;
   dropZone.classList.add('has-url');
-
   document.getElementById('loadingState').style.display = 'block';
   document.getElementById('preview-section').style.display = 'none';
 
   log('Fetching metadata…', 'info');
 
-  // Use noembed for metadata (no API key needed)
   try {
     const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
     const data = await res.json();
 
-    state.title   = data.title   || 'YouTube Video';
+    state.title = data.title || 'YouTube Video';
     state.channel = data.author_name || 'Unknown';
-
-    // Estimate duration from oEmbed thumbnail (we can't get real duration without API key)
-    // We'll use a placeholder and let user set trim manually
-    state.durationSec = 0; // unknown without API key
+    state.durationSec = 0; // We can't reliably get duration without API
 
     document.getElementById('thumbImg').src = `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
     document.getElementById('videoTitle').textContent = state.title;
-    document.getElementById('videoDuration').textContent = state.durationSec ? fmtTime(state.durationSec) : 'Unknown';
+    document.getElementById('videoDuration').textContent = 'Unknown';
     document.getElementById('videoChannel').textContent = state.channel;
 
-    state.endSec = state.durationSec || 600; // default 10min
+    state.endSec = 600; // default 10 minutes
     document.getElementById('endTime').value = fmtTime(state.endSec);
 
     buildWaveform();
@@ -1093,9 +1096,8 @@ async function loadVideo() {
     document.getElementById('preview-section').style.display = 'block';
     log(`Loaded: ${state.title}`, 'ok');
   } catch(e) {
-    document.getElementById('loadingState').style.display = 'none';
-    log('Could not fetch metadata. URL accepted; proceed to download.', 'err');
-    // Still show with fallback
+    log('Metadata fetch failed, but URL is accepted', 'err');
+    // Fallback
     state.title = 'YouTube Video · ' + vid;
     state.channel = '—';
     document.getElementById('thumbImg').src = `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
@@ -1104,15 +1106,19 @@ async function loadVideo() {
     document.getElementById('videoChannel').textContent = state.channel;
     state.endSec = 600;
     document.getElementById('endTime').value = fmtTime(state.endSec);
+
     buildWaveform();
     updateTrimUI();
     updateDlConfig();
+
+    document.getElementById('loadingState').style.display = 'none';
     document.getElementById('preview-section').style.display = 'block';
   }
 }
 
 function clearVideo() {
-  state.url = ''; state.videoId = '';
+  state.url = ''; 
+  state.videoId = '';
   document.getElementById('urlInput').value = '';
   document.getElementById('preview-section').style.display = 'none';
   dropZone.classList.remove('has-url');
@@ -1127,7 +1133,7 @@ function shakeInput() {
   setTimeout(() => inp.style.borderColor = '', 1200);
 }
 
-// ─── FORMAT SELECTION ─────────────────────────────────────────────────────────
+// ─── FORMAT SELECTION ────────────────────────────────────────────────────────
 function setTypeTab(type, el) {
   state.type = type;
   document.querySelectorAll('.format-tabs .tab').forEach(t => t.classList.remove('active'));
@@ -1153,7 +1159,7 @@ function selectAudioFormat(card, fmt, quality) {
   updateDlConfig();
 }
 
-// ─── TRIM ─────────────────────────────────────────────────────────────────────
+// ─── TRIM ────────────────────────────────────────────────────────────────────
 function buildWaveform() {
   const wf = document.getElementById('waveform');
   wf.innerHTML = '';
@@ -1167,20 +1173,20 @@ function buildWaveform() {
   }
 }
 
-// Draggable handles
+// Draggable handles (same as before)
 let dragging = null;
 const timeline = document.getElementById('trimTimeline');
 const handleStart = document.getElementById('handle-start');
-const handleEnd   = document.getElementById('handle-end');
+const handleEnd = document.getElementById('handle-end');
 
 handleStart.addEventListener('mousedown', e => { dragging = 'start'; e.preventDefault(); });
-handleEnd.addEventListener('mousedown',   e => { dragging = 'end';   e.preventDefault(); });
+handleEnd.addEventListener('mousedown', e => { dragging = 'end'; e.preventDefault(); });
 handleStart.addEventListener('touchstart', e => { dragging = 'start'; }, {passive:true});
-handleEnd.addEventListener('touchstart',   e => { dragging = 'end';   }, {passive:true});
+handleEnd.addEventListener('touchstart', e => { dragging = 'end'; }, {passive:true});
 
 document.addEventListener('mousemove', moveHandle);
 document.addEventListener('touchmove', e => moveHandle(e.touches[0]), {passive:true});
-document.addEventListener('mouseup',  () => { dragging = null; });
+document.addEventListener('mouseup', () => { dragging = null; });
 document.addEventListener('touchend', () => { dragging = null; });
 
 function moveHandle(e) {
@@ -1201,27 +1207,30 @@ function moveHandle(e) {
   updateDlConfig();
 }
 
-// Manual time inputs
 document.getElementById('startTime').addEventListener('change', function() {
   state.startSec = parseTime(this.value);
   state.trimActive = true;
-  updateTrimUI(); updateDlConfig();
+  updateTrimUI(); 
+  updateDlConfig();
 });
+
 document.getElementById('endTime').addEventListener('change', function() {
   state.endSec = parseTime(this.value);
   state.trimActive = true;
-  updateTrimUI(); updateDlConfig();
+  updateTrimUI(); 
+  updateDlConfig();
 });
 
 function updateTrimUI() {
   const dur = state.durationSec || 600;
   const pStart = state.startSec / dur;
-  const pEnd   = state.endSec / dur;
+  const pEnd = state.endSec / dur;
   const filled = document.getElementById('trimFilled');
-  filled.style.left  = (pStart * 100) + '%';
+
+  filled.style.left = (pStart * 100) + '%';
   filled.style.width = ((pEnd - pStart) * 100) + '%';
   handleStart.style.left = 'calc(' + (pStart * 100) + '% - 6px)';
-  handleEnd.style.left   = 'calc(' + (pEnd * 100) + '% - 6px)';
+  handleEnd.style.left = 'calc(' + (pEnd * 100) + '% - 6px)';
 
   const selSec = state.endSec - state.startSec;
   document.getElementById('selDuration').innerHTML =
@@ -1237,21 +1246,26 @@ function updateTrimUI() {
 }
 
 function resetTrim() {
-  state.startSec = 0; state.endSec = state.durationSec || 600;
+  state.startSec = 0; 
+  state.endSec = state.durationSec || 600;
   state.trimActive = false;
   document.getElementById('startTime').value = fmtTime(0);
-  document.getElementById('endTime').value   = fmtTime(state.endSec);
-  updateTrimUI(); updateDlConfig();
+  document.getElementById('endTime').value = fmtTime(state.endSec);
+  updateTrimUI(); 
+  updateDlConfig();
 }
 
 function setQuick(start, end) {
-  state.startSec = start; state.endSec = end; state.trimActive = true;
+  state.startSec = start; 
+  state.endSec = end; 
+  state.trimActive = true;
   document.getElementById('startTime').value = fmtTime(start);
-  document.getElementById('endTime').value   = fmtTime(end);
-  updateTrimUI(); updateDlConfig();
+  document.getElementById('endTime').value = fmtTime(end);
+  updateTrimUI(); 
+  updateDlConfig();
 }
 
-// ─── OPTIONS / TOGGLES ───────────────────────────────────────────────────────
+// ─── OPTIONS ─────────────────────────────────────────────────────────────────
 function toggle(el) {
   el.classList.toggle('on');
   const key = el.id.replace('tog-','');
@@ -1262,15 +1276,15 @@ function updateRange(id, val, suffix) {
   document.getElementById(id).textContent = val + (suffix||'');
 }
 
-// ─── DL CONFIG SUMMARY ───────────────────────────────────────────────────────
+// ─── DL CONFIG ───────────────────────────────────────────────────────────────
 function updateDlConfig() {
   let fmtStr, sizeHint;
   if (state.type === 'audio') {
     fmtStr = state.audioFmt.toUpperCase() + ' · ' + (state.audioBitrate === 'best' ? 'Best' : state.audioBitrate + 'kbps');
-    sizeHint = state.audioBitrate === 'best' ? '~8–20MB' : `~${Math.round((parseInt(state.audioBitrate)||256)/8 * 300 / 1000)}MB (5min)`;
+    sizeHint = '~5–25 MB';
   } else {
     fmtStr = state.fmt.toUpperCase() + ' · ' + (state.quality === 'best' ? 'Best' : state.quality);
-    const qMap = { 'best':'~200MB','1080p':'~300MB','720p':'~150MB','480p':'~80MB','360p':'~40MB' };
+    const qMap = {'best':'~150-400MB','1080p':'~250-350MB','720p':'~120-200MB','480p':'~60-100MB','360p':'~30-60MB'};
     sizeHint = qMap[state.quality] || '~?';
   }
   const trimStr = state.trimActive ? ` · Trim ${fmtTime(state.startSec)}–${fmtTime(state.endSec)}` : ' · Full video';
@@ -1278,137 +1292,83 @@ function updateDlConfig() {
   document.getElementById('dlSize').textContent = 'Estimated size: ' + sizeHint;
 }
 
-// ─── DOWNLOAD ─────────────────────────────────────────────────────────────────
-async function startDownload() {
-  if (!state.url) { log('No URL loaded', 'err'); return; }
-
-  const btn = document.getElementById('downloadBtn');
-  btn.disabled = true; btn.textContent = '⏳ LOADING…';
-
-  showProgress('Building request…', 5);
-  log('Connecting to cobalt.tools API…', 'info');
-
-  // Build cobalt request
-  const body = {
-    url: state.url,
-    videoQuality: state.quality === 'best' ? 'max' : state.quality.replace('p',''),
-    audioFormat: state.type === 'audio' ? state.audioFmt : 'mp3',
-    audioBitrate: state.audioBitrate,
-    downloadMode: state.type === 'audio' ? 'audio' : (state.flags.mute ? 'mute' : 'auto'),
-    filenameStyle: 'basic',
-    twitterGif: false,
-    videoCodec: state.fmt === 'webm' ? 'vp9' : 'h264',
-    isAudioMuted: state.flags.mute,
-    disableMetadata: !state.flags.meta,
-  };
-
-  // Add time segment if trim active
-  if (state.trimActive) {
-    body.youtubeVideoCodec = body.videoCodec;
-    // cobalt supports trimStart/trimEnd in seconds as strings
-    body.trimStart = Math.floor(state.startSec);
-    body.trimEnd   = Math.floor(state.endSec);
+// ─── DOWNLOAD - NOW API-FREE ─────────────────────────────────────────────────
+function startDownload() {
+  if (!state.url) {
+    log('Please load a YouTube URL first', 'err');
+    return;
   }
 
-  showProgress('Sending to cobalt.tools…', 30);
+  log('Opening cobalt.tools with your settings...', 'info');
 
-  try {
-    const res = await fetch('https://api.cobalt.tools/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(body)
-    });
+  const params = new URLSearchParams();
+  params.append('url', state.url);
 
-    showProgress('Processing…', 60);
-    const data = await res.json();
-    log('API response: ' + data.status, data.status === 'error' ? 'err' : 'ok');
-
-    if (data.status === 'redirect' || data.status === 'stream' || data.status === 'tunnel') {
-      showProgress('Starting download…', 90);
-      const link = document.createElement('a');
-      link.href = data.url;
-      link.download = buildFilename();
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      showProgress('Download started!', 100);
-      log('Download link opened: ' + data.url.substring(0,60) + '…', 'ok');
-      setTimeout(() => { hideProgress(); }, 2500);
-    } else if (data.status === 'picker') {
-      showProgress('Multiple streams found — opening first', 80);
-      const link = document.createElement('a');
-      link.href = data.picker[0].url;
-      link.download = buildFilename();
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      showProgress('Done!', 100);
-      setTimeout(hideProgress, 2500);
-    } else if (data.status === 'error') {
-      log('cobalt error: ' + (data.error?.code || JSON.stringify(data.error)), 'err');
-      showProgress('Error: ' + (data.error?.code || 'unknown'), 100);
-      document.getElementById('progressFill').style.background = 'var(--red)';
-      setTimeout(hideProgress, 3000);
-    } else {
-      log('Unexpected response: ' + JSON.stringify(data).substring(0,120), 'err');
-      hideProgress();
+  if (state.type === 'audio') {
+    params.append('audioOnly', 'true');
+    params.append('audioFormat', state.audioFmt);
+    if (state.audioBitrate !== 'best') {
+      params.append('audioBitrate', state.audioBitrate);
     }
-  } catch(err) {
-    log('Network/CORS error: ' + err.message + ' — try opening this page from a local server or use cobalt.tools directly', 'err');
-    showProgress('Connection failed', 100);
-    document.getElementById('progressFill').style.background = 'var(--red)';
-    setTimeout(hideProgress, 3000);
+  } else {
+    if (state.quality !== 'best') {
+      params.append('quality', state.quality.replace('p', ''));
+    }
+    if (state.fmt === 'webm') {
+      params.append('codec', 'vp9');
+    }
   }
 
-  btn.disabled = false;
-  btn.textContent = '↓ DOWNLOAD';
+  if (state.trimActive) {
+    params.append('start', Math.floor(state.startSec));
+    params.append('end', Math.floor(state.endSec));
+  }
+
+  if (state.flags.mute) {
+    params.append('mute', 'true');
+  }
+
+  const cobaltUrl = `https://cobalt.tools/?${params.toString()}`;
+
+  window.open(cobaltUrl, '_blank');
+  log('✅ Opened cobalt.tools — download from there', 'ok');
 }
 
-function buildFilename() {
-  const tmpl = document.getElementById('filenameInput').value || '{title}_{quality}';
-  const q = state.type === 'audio' ? state.audioBitrate + 'kbps' : state.quality;
-  return tmpl
-    .replace('{title}', state.title.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'_'))
-    .replace('{quality}', q)
-    .replace('{ext}', state.type === 'audio' ? state.audioFmt : state.fmt)
-    + '.' + (state.type === 'audio' ? state.audioFmt : state.fmt);
-}
-
-async function copyLink() {
+// Keep your existing fallback buttons (they are useful)
+function openY2mate() {
   if (!state.url) return;
-  try {
-    await navigator.clipboard.writeText(state.url);
-    const btn = document.getElementById('copyLinkBtn');
-    btn.textContent = '✓ COPIED';
-    setTimeout(() => btn.textContent = '⎘ COPY LINK', 1500);
-  } catch {}
+  const y2mateUrl = `https://www.y2mate.com/youtube/${state.videoId}`;
+  window.open(y2mateUrl, '_blank');
 }
 
-// ─── PROGRESS ────────────────────────────────────────────────────────────────
+function openCobaltWeb() {
+  startDownload(); // reuse the same function
+}
+
+// ─── PROGRESS & LOG (kept for UI consistency) ────────────────────────────────
 function showProgress(label, pct) {
   const wrap = document.getElementById('progressWrap');
   wrap.style.display = 'block';
   document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressFill').style.background = 'var(--amber)';
   document.getElementById('progressLabel').textContent = label;
 }
+
 function hideProgress() {
   document.getElementById('progressWrap').style.display = 'none';
 }
 
-// ─── LOG ─────────────────────────────────────────────────────────────────────
 function log(msg, type='info') {
   const panel = document.getElementById('logPanel');
   panel.style.display = 'block';
   const d = document.createElement('div');
-  d.className = 'log-line ' + type;
+  d.className = `log-line ${type}`;
   const now = new Date();
   d.innerHTML = `<span class="ts">[${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}]</span><span class="msg">${msg}</span>`;
   panel.appendChild(d);
   panel.scrollTop = panel.scrollHeight;
 }
 
-// ─── SECTION COLLAPSE ────────────────────────────────────────────────────────
+// ─── SECTION TOGGLE ──────────────────────────────────────────────────────────
 function toggleSection(id) {
   document.getElementById(id).classList.toggle('collapsed');
 }
@@ -1421,15 +1381,17 @@ function fmtTime(sec) {
   const s = sec%60;
   return `${h}:${pad(m)}:${pad(s)}`;
 }
+
 function parseTime(str) {
   const p = str.split(':').map(Number);
   if (p.length === 3) return p[0]*3600 + p[1]*60 + p[2];
   if (p.length === 2) return p[0]*60 + p[1];
   return p[0] || 0;
 }
+
 function pad(n) { return String(n).padStart(2,'0'); }
 
-// Init
+// ─── INIT ────────────────────────────────────────────────────────────────────
 updateDlConfig();
 </script>
 </body>
