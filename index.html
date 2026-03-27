@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YTCut — Download & Convert YouTube</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0c0c0e;
+    --surface:  #141418;
+    --panel:    #1a1a20;
+    --border:   #2a2a35;
+    --border2:  #3a3a48;
+    --amber:    #f5a623;
+    --red:      #ff4d4d;
+    --green:    #4dff91;
+    --blue:     #4d9fff;
+    --text:     #e8e8f0;
+    --muted:    #7070888;
+    --muted2:   #505060;
+    --mono:     'Space Mono', monospace;
+    --sans:     'Syne', sans-serif;
+    --radius:   6px;
+    --radius2:  12px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(12,12,14,0.92);
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo span { color: var(--amber); }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted2);
+    border: 1px solid var(--border2);
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Main layout */
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 12px;
+  }
+  .hero h1 em { color: var(--amber); font-style: normal; }
+  .hero p {
+    color: var(--muted2);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+  }
+
+  /* URL Drop Zone */
+  .url-zone {
+    background: var(--surface);
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius2);
+    padding: 32px;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 24px;
+    cursor: text;
+  }
+  .url-zone.drag-over {
+    border-color: var(--amber);
+    background: rgba(245,166,35,0.04);
+  }
+  .url-zone.has-url {
+    border-style: solid;
+    border-color: var(--amber);
+  }
+
+  .url-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted2);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .url-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--amber);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .url-input-row {
+    display: flex; gap: 10px; align-items: stretch;
+  }
+  .url-input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .url-input:focus { border-color: var(--amber); }
+  .url-input::placeholder { color: var(--muted2); }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    padding: 12px 20px;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .btn-amber {
+    background: var(--amber);
+    color: #000;
+  }
+  .btn-amber:hover { background: #ffbe4d; transform: translateY(-1px); }
+  .btn-amber:active { transform: translateY(0); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted2);
+    border: 1px solid var(--border2);
+  }
+  .btn-ghost:hover { border-color: var(--border2); color: var(--text); background: var(--panel); }
+  .btn-red {
+    background: var(--red);
+    color: #fff;
+  }
+  .btn-red:hover { background: #ff6b6b; }
+  .btn-green {
+    background: var(--green);
+    color: #000;
+  }
+  .btn-green:hover { background: #6fffaa; }
+  .btn-green:disabled {
+    opacity: 0.4; cursor: not-allowed; transform: none;
+  }
+
+  .paste-hint {
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted2);
+    display: flex; gap: 16px;
+  }
+  .paste-hint kbd {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+  }
+
+  /* Video Preview */
+  #preview-section {
+    display: none;
+    animation: fadeSlide 0.35s ease;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .video-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .preview-inner {
+    display: flex; gap: 0;
+  }
+
+  .thumb-wrap {
+    position: relative;
+    width: 200px;
+    min-width: 200px;
+    background: #000;
+    overflow: hidden;
+  }
+  .thumb-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0.9;
+  }
+  .thumb-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.3);
+  }
+  .play-icon {
+    width: 44px; height: 44px;
+    background: rgba(245,166,35,0.9);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .play-icon svg { margin-left: 3px; }
+
+  .video-meta {
+    padding: 20px 24px;
+    flex: 1;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .video-title {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .video-stats {
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .stat {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted2);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .stat-val { color: var(--text); }
+
+  /* Sections */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .section-header:hover { background: var(--panel); }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title svg { opacity: 0.7; }
+
+  .chevron {
+    transition: transform 0.2s;
+    color: var(--muted2);
+  }
+  .section.collapsed .chevron { transform: rotate(-90deg); }
+  .section-body {
+    padding: 20px;
+    transition: none;
+  }
+  .section.collapsed .section-body { display: none; }
+
+  /* Format Grid */
+  .format-tabs {
+    display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .tab {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted2);
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text); border-color: var(--text); }
+  .tab.active {
+    background: var(--amber);
+    color: #000;
+    border-color: var(--amber);
+    font-weight: 700;
+  }
+
+  .format-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+  }
+
+  .format-card {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 12px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .format-card:hover { border-color: var(--amber); }
+  .format-card.active {
+    border-color: var(--amber);
+    background: rgba(245,166,35,0.08);
+  }
+  .format-card .fmt { font-family: var(--mono); font-size: 0.85rem; font-weight: 700; color: var(--text); }
+  .format-card .fmt-sub { font-family: var(--mono); font-size: 0.6rem; color: var(--muted2); margin-top: 3px; }
+  .format-card.active .fmt { color: var(--amber); }
+
+  /* Quality Slider */
+  .quality-row {
+    display: flex; align-items: center; gap: 16px; margin-top: 16px;
+  }
+  .quality-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 80px;
+  }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    background: var(--amber);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  .range-val {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--amber);
+    min-width: 50px;
+    text-align: right;
+  }
+
+  /* Trim Controls */
+  .trim-timeline {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    height: 48px;
+    margin: 16px 0;
+    overflow: hidden;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  .trim-filled {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: rgba(245,166,35,0.15);
+    border-left: 2px solid var(--amber);
+    border-right: 2px solid var(--amber);
+    transition: left 0s, width 0s;
+  }
+  .trim-waveform {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; gap: 1px; padding: 6px 4px;
+  }
+  .wbar {
+    flex: 1;
+    border-radius: 1px;
+    background: var(--border2);
+    opacity: 0.6;
+    min-width: 2px;
+  }
+
+  .handle {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 12px;
+    background: var(--amber);
+    cursor: col-resize;
+    z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px;
+  }
+  .handle svg { color: #000; opacity: 0.7; }
+  #handle-start { left: 0; border-radius: 2px 0 0 2px; }
+  #handle-end   { right: 0; transform: translateX(100%); border-radius: 0 2px 2px 0; }
+
+  .time-row {
+    display: flex; justify-content: space-between; gap: 16px;
+  }
+  .time-input-wrap {
+    flex: 1;
+  }
+  .time-lbl {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .time-input {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    text-align: center;
+  }
+  .time-input:focus { border-color: var(--amber); }
+
+  .trim-duration {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted2);
+    margin-top: 8px;
+  }
+  .trim-duration span { color: var(--amber); }
+
+  /* Options grid */
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 480px) { .options-grid { grid-template-columns: 1fr; } }
+
+  .option-item {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .opt-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .opt-select {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    padding: 9px 12px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23505060' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  .opt-select:focus { border-color: var(--amber); }
+
+  /* Toggle switches */
+  .toggles-row {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px;
+  }
+  .toggle-item {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 8px 12px;
+    transition: border-color 0.15s;
+  }
+  .toggle-item:hover { border-color: var(--border2); }
+  .toggle-item.on { border-color: var(--amber); background: rgba(245,166,35,0.06); }
+  .toggle-cb {
+    width: 32px; height: 18px;
+    background: var(--border2);
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-item.on .toggle-cb { background: var(--amber); }
+  .toggle-cb::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left 0.2s;
+  }
+  .toggle-item.on .toggle-cb::after { left: 16px; }
+  .toggle-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .toggle-item.on .toggle-label { color: var(--text); }
+
+  /* Download bar */
+  .dl-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .dl-info {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .dl-config {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted2);
+  }
+  .dl-config span { color: var(--amber); }
+  .dl-size {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted2);
+  }
+
+  .dl-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  /* Progress */
+  .progress-wrap {
+    display: none;
+    margin-top: 12px;
+  }
+  .progress-bar {
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--amber);
+    width: 0%;
+    transition: width 0.3s;
+    border-radius: 2px;
+  }
+  .progress-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted2);
+    margin-top: 6px;
+  }
+
+  /* Log */
+  .log-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted2);
+    max-height: 100px;
+    overflow-y: auto;
+    line-height: 1.8;
+    display: none;
+  }
+  .log-panel .log-line { display: flex; gap: 8px; }
+  .log-line .ts { color: var(--border2); }
+  .log-line.ok .msg { color: var(--green); }
+  .log-line.err .msg { color: var(--red); }
+  .log-line.info .msg { color: var(--amber); }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    header { padding: 16px 20px; }
+    main { padding: 32px 16px 60px; }
+    .preview-inner { flex-direction: column; }
+    .thumb-wrap { width: 100%; height: 140px; min-width: unset; }
+    .dl-bar { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* Loading shimmer */
+  .shimmer {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--panel) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* Tooltip */
+  [data-tip] { position: relative; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 10;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+
+  /* Notice */
+  .notice {
+    background: rgba(77,159,255,0.06);
+    border: 1px solid rgba(77,159,255,0.25);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: #7ab8ff;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .notice a { color: var(--blue); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">YT<span>CUT</span></div>
+  <div class="badge">v2.0 · cobalt-powered</div>
+</header>
+
+<main>
+
+  <div class="hero">
+    <h1>Trim, Convert &<br><em>Download</em> YouTube</h1>
+    <p>// paste url · set format · trim · export</p>
+  </div>
+
+  <!-- URL Zone -->
+  <div class="url-zone" id="dropZone">
+    <div class="url-label">YouTube URL</div>
+    <div class="url-input-row">
+      <input type="text" class="url-input" id="urlInput" placeholder="https://youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+      <button class="btn btn-ghost" id="pasteBtn" data-tip="Paste from clipboard">PASTE</button>
+      <button class="btn btn-amber" id="loadBtn">LOAD →</button>
+    </div>
+    <div class="paste-hint">
+      <span>Drop a link anywhere on the page</span>
+      <span><kbd>Ctrl</kbd>+<kbd>V</kbd> to paste</span>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div id="loadingState" style="display:none; margin-bottom:24px;">
+    <div class="section-header" style="border-radius:12px; border:1px solid var(--border);">
+      <div style="display:flex;gap:12px;align-items:center;flex:1;">
+        <div class="shimmer" style="width:72px;height:54px;border-radius:6px;"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+          <div class="shimmer" style="height:14px;width:60%;"></div>
+          <div class="shimmer" style="height:10px;width:40%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview + All config sections -->
+  <div id="preview-section">
+
+    <div class="video-preview">
+      <div class="preview-inner">
+        <div class="thumb-wrap">
+          <img id="thumbImg" src="" alt="thumbnail">
+          <div class="thumb-overlay">
+            <div class="play-icon">
+              <svg width="14" height="16" fill="none" viewBox="0 0 14 16"><path d="M1 1l12 7L1 15V1z" fill="#000" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="video-meta">
+          <div>
+            <div class="video-title" id="videoTitle">—</div>
+            <div class="video-stats">
+              <div class="stat">DURATION <span class="stat-val" id="videoDuration">—</span></div>
+              <div class="stat">CHANNEL <span class="stat-val" id="videoChannel">—</span></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-ghost" id="clearBtn" style="font-size:0.65rem;padding:7px 12px;">✕ CLEAR</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORMAT SECTION -->
+    <div class="section" id="secFormat">
+      <div class="section-header" onclick="toggleSection('secFormat')">
+        <div class="section-title">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2h8v8H2z" stroke="currentColor" stroke-width="1.5"/><path d="M4 6h4M6 4v4" stroke="currentColor" stroke-width="1.5"/></svg>
+          FORMAT & QUALITY
+        </div>
+        <svg class="chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="section-body">
+        <div class="format-tabs">
+          <button class="tab active" onclick="setTypeTab('video',this)">VIDEO</button>
+          <button class="tab" onclick="setTypeTab('audio',this)">AUDIO ONLY</button>
+        </div>
+
+        <!-- VIDEO formats -->
+        <div id="videoFormats">
+          <div class="format-grid" id="videoFormatGrid">
+            <div class="format-card active" onclick="selectFormat(this,'mp4','best')" data-fmt="mp4" data-q="best">
+              <div class="fmt">MP4</div><div class="fmt-sub">H.264</div>
+            </div>
+            <div class="format-card" onclick="selectFormat(this,'mp4','1080p')" data-fmt="mp4" data-q="1080p">
+              <div class="fmt">MP4</div><div class="fmt-sub">1080p</div>
+            </div>
+            <div class="format-card" onclick="selectFormat(this,'mp4','720p')" data-fmt="mp4" data-q="720p">
+              <div class="fmt">MP4</div><div class="fmt-sub">720p</div>
+            </div>
+            <div class="format-card" onclick="selectFormat(this,'mp4','480p')" data-fmt="mp4" data-q="480p">
+              <div class="fmt">MP4</div><div class="fmt-sub">480p</div>
+            </div>
+            <div class="format-card" onclick="selectFormat(this,'mp4','360p')" data-fmt="mp4" data-q="360p">
+              <div class="fmt">MP4</div><div class="fmt-sub">360p</div>
+            </div>
+            <div class="format-card" onclick="selectFormat(this,'webm','best')" data-fmt="webm" data-q="best">
+              <div class="fmt">WebM</div><div class="fmt-sub">VP9</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUDIO formats -->
+        <div id="audioFormats" style="display:none;">
+          <div class="format-grid" id="audioFormatGrid">
+            <div class="format-card active" onclick="selectAudioFormat(this,'mp3','320')" data-fmt="mp3" data-q="320">
+              <div class="fmt">MP3</div><div class="fmt-sub">320kbps</div>
+            </div>
+            <div class="format-card" onclick="selectAudioFormat(this,'mp3','256')" data-fmt="mp3" data-q="256">
+              <div class="fmt">MP3</div><div class="fmt-sub">256kbps</div>
+            </div>
+            <div class="format-card" onclick="selectAudioFormat(this,'mp3','128')" data-fmt="mp3" data-q="128">
+              <div class="fmt">MP3</div><div class="fmt-sub">128kbps</div>
+            </div>
+            <div class="format-card" onclick="selectAudioFormat(this,'ogg','best')" data-fmt="ogg" data-q="best">
+              <div class="fmt">OGG</div><div class="fmt-sub">Vorbis</div>
+            </div>
+            <div class="format-card" onclick="selectAudioFormat(this,'opus','best')" data-fmt="opus" data-q="best">
+              <div class="fmt">OPUS</div><div class="fmt-sub">High Q</div>
+            </div>
+            <div class="format-card" onclick="selectAudioFormat(this,'wav','best')" data-fmt="wav" data-q="best">
+              <div class="fmt">WAV</div><div class="fmt-sub">Lossless</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TRIM SECTION -->
+    <div class="section" id="secTrim">
+      <div class="section-header" onclick="toggleSection('secTrim')">
+        <div class="section-title">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6h10M4 2v8M8 2v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          TRIM / CUT
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="trimBadge" style="font-family:var(--mono);font-size:0.65rem;color:var(--muted2);display:none;"></span>
+          <svg class="chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="notice">
+          ⚡ Trim sets the start/end timestamps sent to cobalt. Server-side trimming depends on the service. For precise local trim, use the timestamp fields — they will be embedded in the download request.
+        </div>
+
+        <!-- Timeline -->
+        <div class="trim-timeline" id="trimTimeline">
+          <div class="trim-waveform" id="waveform"></div>
+          <div class="trim-filled" id="trimFilled"></div>
+          <div class="handle" id="handle-start">
+            <svg width="4" height="10" viewBox="0 0 4 10"><path d="M2 1v8M0 3l2-2 2 2M0 7l2 2 2-2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          </div>
+          <div class="handle" id="handle-end">
+            <svg width="4" height="10" viewBox="0 0 4 10"><path d="M2 1v8M0 3l2-2 2 2M0 7l2 2 2-2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+
+        <div class="time-row">
+          <div class="time-input-wrap">
+            <div class="time-lbl">START TIME</div>
+            <input type="text" class="time-input" id="startTime" value="0:00:00" placeholder="0:00:00">
+          </div>
+          <div class="time-input-wrap">
+            <div class="time-lbl">END TIME</div>
+            <input type="text" class="time-input" id="endTime" value="0:00:00" placeholder="0:00:00">
+          </div>
+        </div>
+        <div class="trim-duration">Selected: <span id="selDuration">full video</span></div>
+
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" style="font-size:0.65rem;" onclick="resetTrim()">↺ RESET TRIM</button>
+          <button class="btn btn-ghost" style="font-size:0.65rem;" onclick="setQuick(0,30)">FIRST 30S</button>
+          <button class="btn btn-ghost" style="font-size:0.65rem;" onclick="setQuick(0,60)">FIRST 1MIN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPTIONS SECTION -->
+    <div class="section" id="secOptions">
+      <div class="section-header" onclick="toggleSection('secOptions')">
+        <div class="section-title">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          ADVANCED OPTIONS
+        </div>
+        <svg class="chevron" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="section-body">
+        <div class="options-grid">
+          <div class="option-item">
+            <div class="opt-label">Filename Template</div>
+            <input type="text" class="time-input" id="filenameInput" placeholder="{title}_{quality}" value="{title}_{quality}" style="text-align:left;font-size:0.75rem;">
+          </div>
+          <div class="option-item">
+            <div class="opt-label">Subtitle Language</div>
+            <select class="opt-select" id="subtitleSel">
+              <option value="">None</option>
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="ja">Japanese</option>
+              <option value="zh">Chinese</option>
+              <option value="ar">Arabic</option>
+              <option value="bn">Bengali</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="opt-label" style="margin-bottom:10px;">Download Flags</div>
+          <div class="toggles-row" id="flagsRow">
+            <div class="toggle-item" onclick="toggle(this)" id="tog-mute">
+              <div class="toggle-cb"></div>
+              <div class="toggle-label">Mute Audio</div>
+            </div>
+            <div class="toggle-item" onclick="toggle(this)" id="tog-hdr">
+              <div class="toggle-cb"></div>
+              <div class="toggle-label">HDR (if avail)</div>
+            </div>
+            <div class="toggle-item on" onclick="toggle(this)" id="tog-merge">
+              <div class="toggle-cb"></div>
+              <div class="toggle-label">Auto-Merge</div>
+            </div>
+            <div class="toggle-item" onclick="toggle(this)" id="tog-thumb">
+              <div class="toggle-cb"></div>
+              <div class="toggle-label">Embed Thumbnail</div>
+            </div>
+            <div class="toggle-item" onclick="toggle(this)" id="tog-meta">
+              <div class="toggle-cb"></div>
+              <div class="toggle-label">Embed Metadata</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="quality-row">
+            <div class="quality-label">Audio Vol</div>
+            <input type="range" id="volRange" min="50" max="200" value="100" step="5" oninput="updateRange('volVal',this.value,'%')">
+            <div class="range-val" id="volVal">100%</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- DOWNLOAD BAR -->
+    <div class="dl-bar">
+      <div class="dl-info">
+        <div class="dl-config" id="dlConfig">Format: <span>MP4 · Best</span> · No trim</div>
+        <div class="dl-size" id="dlSize">Estimated size: —</div>
+      </div>
+      <div class="dl-actions">
+        <button class="btn btn-ghost" onclick="copyLink()" id="copyLinkBtn" data-tip="Copy processed link">
+          ⎘ COPY LINK
+        </button>
+        <button class="btn btn-green" id="downloadBtn" onclick="startDownload()">
+          ↓ DOWNLOAD
+        </button>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">Connecting to cobalt…</div>
+    </div>
+
+    <div class="log-panel" id="logPanel"></div>
+
+  </div><!-- /preview-section -->
+
+</main>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state = {
+  url: '',
+  videoId: '',
+  title: '',
+  channel: '',
+  durationSec: 0,
+  type: 'video',       // 'video' | 'audio'
+  fmt: 'mp4',
+  quality: 'best',
+  audioFmt: 'mp3',
+  audioBitrate: '320',
+  startSec: 0,
+  endSec: 0,
+  trimActive: false,
+  flags: {mute:false, hdr:false, merge:true, thumb:false, meta:false}
+};
+
+// ─── URL INPUT ────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+    document.getElementById('urlInput').focus();
+  }
+});
+
+// Drag-over zone
+const dropZone = document.getElementById('dropZone');
+document.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+document.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const text = e.dataTransfer.getData('text');
+  if (text) { document.getElementById('urlInput').value = text; loadVideo(); }
+});
+
+document.getElementById('pasteBtn').onclick = async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById('urlInput').value = text;
+    loadVideo();
+  } catch { log('Clipboard access denied — paste manually', 'err'); }
+};
+
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadVideo();
+});
+
+document.getElementById('loadBtn').onclick = loadVideo;
+document.getElementById('clearBtn').onclick = clearVideo;
+
+// ─── LOAD VIDEO ───────────────────────────────────────────────────────────────
+function extractVideoId(url) {
+  const m = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+  return m ? m[1] : null;
+}
+
+async function loadVideo() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+
+  const vid = extractVideoId(url);
+  if (!vid) { log('Invalid YouTube URL', 'err'); shakeInput(); return; }
+
+  state.url = url;
+  state.videoId = vid;
+  dropZone.classList.add('has-url');
+
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('preview-section').style.display = 'none';
+
+  log('Fetching metadata…', 'info');
+
+  // Use noembed for metadata (no API key needed)
+  try {
+    const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
+    const data = await res.json();
+
+    state.title   = data.title   || 'YouTube Video';
+    state.channel = data.author_name || 'Unknown';
+
+    // Estimate duration from oEmbed thumbnail (we can't get real duration without API key)
+    // We'll use a placeholder and let user set trim manually
+    state.durationSec = 0; // unknown without API key
+
+    document.getElementById('thumbImg').src = `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
+    document.getElementById('videoTitle').textContent = state.title;
+    document.getElementById('videoDuration').textContent = state.durationSec ? fmtTime(state.durationSec) : 'Unknown';
+    document.getElementById('videoChannel').textContent = state.channel;
+
+    state.endSec = state.durationSec || 600; // default 10min
+    document.getElementById('endTime').value = fmtTime(state.endSec);
+
+    buildWaveform();
+    updateTrimUI();
+    updateDlConfig();
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('preview-section').style.display = 'block';
+    log(`Loaded: ${state.title}`, 'ok');
+  } catch(e) {
+    document.getElementById('loadingState').style.display = 'none';
+    log('Could not fetch metadata. URL accepted; proceed to download.', 'err');
+    // Still show with fallback
+    state.title = 'YouTube Video · ' + vid;
+    state.channel = '—';
+    document.getElementById('thumbImg').src = `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
+    document.getElementById('videoTitle').textContent = state.title;
+    document.getElementById('videoDuration').textContent = '—';
+    document.getElementById('videoChannel').textContent = state.channel;
+    state.endSec = 600;
+    document.getElementById('endTime').value = fmtTime(state.endSec);
+    buildWaveform();
+    updateTrimUI();
+    updateDlConfig();
+    document.getElementById('preview-section').style.display = 'block';
+  }
+}
+
+function clearVideo() {
+  state.url = ''; state.videoId = '';
+  document.getElementById('urlInput').value = '';
+  document.getElementById('preview-section').style.display = 'none';
+  dropZone.classList.remove('has-url');
+  document.getElementById('logPanel').style.display = 'none';
+  document.getElementById('logPanel').innerHTML = '';
+  document.getElementById('progressWrap').style.display = 'none';
+}
+
+function shakeInput() {
+  const inp = document.getElementById('urlInput');
+  inp.style.borderColor = 'var(--red)';
+  setTimeout(() => inp.style.borderColor = '', 1200);
+}
+
+// ─── FORMAT SELECTION ─────────────────────────────────────────────────────────
+function setTypeTab(type, el) {
+  state.type = type;
+  document.querySelectorAll('.format-tabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('videoFormats').style.display = type === 'video' ? 'block' : 'none';
+  document.getElementById('audioFormats').style.display = type === 'audio' ? 'block' : 'none';
+  updateDlConfig();
+}
+
+function selectFormat(card, fmt, quality) {
+  document.querySelectorAll('#videoFormatGrid .format-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  state.fmt = fmt;
+  state.quality = quality;
+  updateDlConfig();
+}
+
+function selectAudioFormat(card, fmt, quality) {
+  document.querySelectorAll('#audioFormatGrid .format-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  state.audioFmt = fmt;
+  state.audioBitrate = quality;
+  updateDlConfig();
+}
+
+// ─── TRIM ─────────────────────────────────────────────────────────────────────
+function buildWaveform() {
+  const wf = document.getElementById('waveform');
+  wf.innerHTML = '';
+  const bars = 80;
+  for (let i = 0; i < bars; i++) {
+    const h = 30 + Math.random() * 70;
+    const bar = document.createElement('div');
+    bar.className = 'wbar';
+    bar.style.height = h + '%';
+    wf.appendChild(bar);
+  }
+}
+
+// Draggable handles
+let dragging = null;
+const timeline = document.getElementById('trimTimeline');
+const handleStart = document.getElementById('handle-start');
+const handleEnd   = document.getElementById('handle-end');
+
+handleStart.addEventListener('mousedown', e => { dragging = 'start'; e.preventDefault(); });
+handleEnd.addEventListener('mousedown',   e => { dragging = 'end';   e.preventDefault(); });
+handleStart.addEventListener('touchstart', e => { dragging = 'start'; }, {passive:true});
+handleEnd.addEventListener('touchstart',   e => { dragging = 'end';   }, {passive:true});
+
+document.addEventListener('mousemove', moveHandle);
+document.addEventListener('touchmove', e => moveHandle(e.touches[0]), {passive:true});
+document.addEventListener('mouseup',  () => { dragging = null; });
+document.addEventListener('touchend', () => { dragging = null; });
+
+function moveHandle(e) {
+  if (!dragging) return;
+  const rect = timeline.getBoundingClientRect();
+  let pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const dur = state.durationSec || 600;
+
+  if (dragging === 'start') {
+    state.startSec = Math.min(pct * dur, state.endSec - 2);
+    document.getElementById('startTime').value = fmtTime(state.startSec);
+  } else {
+    state.endSec = Math.max(pct * dur, state.startSec + 2);
+    document.getElementById('endTime').value = fmtTime(state.endSec);
+  }
+  state.trimActive = state.startSec > 0 || state.endSec < dur;
+  updateTrimUI();
+  updateDlConfig();
+}
+
+// Manual time inputs
+document.getElementById('startTime').addEventListener('change', function() {
+  state.startSec = parseTime(this.value);
+  state.trimActive = true;
+  updateTrimUI(); updateDlConfig();
+});
+document.getElementById('endTime').addEventListener('change', function() {
+  state.endSec = parseTime(this.value);
+  state.trimActive = true;
+  updateTrimUI(); updateDlConfig();
+});
+
+function updateTrimUI() {
+  const dur = state.durationSec || 600;
+  const pStart = state.startSec / dur;
+  const pEnd   = state.endSec / dur;
+  const filled = document.getElementById('trimFilled');
+  filled.style.left  = (pStart * 100) + '%';
+  filled.style.width = ((pEnd - pStart) * 100) + '%';
+  handleStart.style.left = 'calc(' + (pStart * 100) + '% - 6px)';
+  handleEnd.style.left   = 'calc(' + (pEnd * 100) + '% - 6px)';
+
+  const selSec = state.endSec - state.startSec;
+  document.getElementById('selDuration').innerHTML =
+    state.trimActive ? `<span>${fmtTime(selSec)}</span>` : 'full video';
+
+  const badge = document.getElementById('trimBadge');
+  if (state.trimActive) {
+    badge.textContent = fmtTime(state.startSec) + ' → ' + fmtTime(state.endSec);
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function resetTrim() {
+  state.startSec = 0; state.endSec = state.durationSec || 600;
+  state.trimActive = false;
+  document.getElementById('startTime').value = fmtTime(0);
+  document.getElementById('endTime').value   = fmtTime(state.endSec);
+  updateTrimUI(); updateDlConfig();
+}
+
+function setQuick(start, end) {
+  state.startSec = start; state.endSec = end; state.trimActive = true;
+  document.getElementById('startTime').value = fmtTime(start);
+  document.getElementById('endTime').value   = fmtTime(end);
+  updateTrimUI(); updateDlConfig();
+}
+
+// ─── OPTIONS / TOGGLES ───────────────────────────────────────────────────────
+function toggle(el) {
+  el.classList.toggle('on');
+  const key = el.id.replace('tog-','');
+  state.flags[key] = el.classList.contains('on');
+}
+
+function updateRange(id, val, suffix) {
+  document.getElementById(id).textContent = val + (suffix||'');
+}
+
+// ─── DL CONFIG SUMMARY ───────────────────────────────────────────────────────
+function updateDlConfig() {
+  let fmtStr, sizeHint;
+  if (state.type === 'audio') {
+    fmtStr = state.audioFmt.toUpperCase() + ' · ' + (state.audioBitrate === 'best' ? 'Best' : state.audioBitrate + 'kbps');
+    sizeHint = state.audioBitrate === 'best' ? '~8–20MB' : `~${Math.round((parseInt(state.audioBitrate)||256)/8 * 300 / 1000)}MB (5min)`;
+  } else {
+    fmtStr = state.fmt.toUpperCase() + ' · ' + (state.quality === 'best' ? 'Best' : state.quality);
+    const qMap = { 'best':'~200MB','1080p':'~300MB','720p':'~150MB','480p':'~80MB','360p':'~40MB' };
+    sizeHint = qMap[state.quality] || '~?';
+  }
+  const trimStr = state.trimActive ? ` · Trim ${fmtTime(state.startSec)}–${fmtTime(state.endSec)}` : ' · Full video';
+  document.getElementById('dlConfig').innerHTML = `Format: <span>${fmtStr}</span>${trimStr}`;
+  document.getElementById('dlSize').textContent = 'Estimated size: ' + sizeHint;
+}
+
+// ─── DOWNLOAD ─────────────────────────────────────────────────────────────────
+async function startDownload() {
+  if (!state.url) { log('No URL loaded', 'err'); return; }
+
+  const btn = document.getElementById('downloadBtn');
+  btn.disabled = true; btn.textContent = '⏳ LOADING…';
+
+  showProgress('Building request…', 5);
+  log('Connecting to cobalt.tools API…', 'info');
+
+  // Build cobalt request
+  const body = {
+    url: state.url,
+    videoQuality: state.quality === 'best' ? 'max' : state.quality.replace('p',''),
+    audioFormat: state.type === 'audio' ? state.audioFmt : 'mp3',
+    audioBitrate: state.audioBitrate,
+    downloadMode: state.type === 'audio' ? 'audio' : (state.flags.mute ? 'mute' : 'auto'),
+    filenameStyle: 'basic',
+    twitterGif: false,
+    videoCodec: state.fmt === 'webm' ? 'vp9' : 'h264',
+    isAudioMuted: state.flags.mute,
+    disableMetadata: !state.flags.meta,
+  };
+
+  // Add time segment if trim active
+  if (state.trimActive) {
+    body.youtubeVideoCodec = body.videoCodec;
+    // cobalt supports trimStart/trimEnd in seconds as strings
+    body.trimStart = Math.floor(state.startSec);
+    body.trimEnd   = Math.floor(state.endSec);
+  }
+
+  showProgress('Sending to cobalt.tools…', 30);
+
+  try {
+    const res = await fetch('https://api.cobalt.tools/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    showProgress('Processing…', 60);
+    const data = await res.json();
+    log('API response: ' + data.status, data.status === 'error' ? 'err' : 'ok');
+
+    if (data.status === 'redirect' || data.status === 'stream' || data.status === 'tunnel') {
+      showProgress('Starting download…', 90);
+      const link = document.createElement('a');
+      link.href = data.url;
+      link.download = buildFilename();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showProgress('Download started!', 100);
+      log('Download link opened: ' + data.url.substring(0,60) + '…', 'ok');
+      setTimeout(() => { hideProgress(); }, 2500);
+    } else if (data.status === 'picker') {
+      showProgress('Multiple streams found — opening first', 80);
+      const link = document.createElement('a');
+      link.href = data.picker[0].url;
+      link.download = buildFilename();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showProgress('Done!', 100);
+      setTimeout(hideProgress, 2500);
+    } else if (data.status === 'error') {
+      log('cobalt error: ' + (data.error?.code || JSON.stringify(data.error)), 'err');
+      showProgress('Error: ' + (data.error?.code || 'unknown'), 100);
+      document.getElementById('progressFill').style.background = 'var(--red)';
+      setTimeout(hideProgress, 3000);
+    } else {
+      log('Unexpected response: ' + JSON.stringify(data).substring(0,120), 'err');
+      hideProgress();
+    }
+  } catch(err) {
+    log('Network/CORS error: ' + err.message + ' — try opening this page from a local server or use cobalt.tools directly', 'err');
+    showProgress('Connection failed', 100);
+    document.getElementById('progressFill').style.background = 'var(--red)';
+    setTimeout(hideProgress, 3000);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '↓ DOWNLOAD';
+}
+
+function buildFilename() {
+  const tmpl = document.getElementById('filenameInput').value || '{title}_{quality}';
+  const q = state.type === 'audio' ? state.audioBitrate + 'kbps' : state.quality;
+  return tmpl
+    .replace('{title}', state.title.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'_'))
+    .replace('{quality}', q)
+    .replace('{ext}', state.type === 'audio' ? state.audioFmt : state.fmt)
+    + '.' + (state.type === 'audio' ? state.audioFmt : state.fmt);
+}
+
+async function copyLink() {
+  if (!state.url) return;
+  try {
+    await navigator.clipboard.writeText(state.url);
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = '✓ COPIED';
+    setTimeout(() => btn.textContent = '⎘ COPY LINK', 1500);
+  } catch {}
+}
+
+// ─── PROGRESS ────────────────────────────────────────────────────────────────
+function showProgress(label, pct) {
+  const wrap = document.getElementById('progressWrap');
+  wrap.style.display = 'block';
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressFill').style.background = 'var(--amber)';
+  document.getElementById('progressLabel').textContent = label;
+}
+function hideProgress() {
+  document.getElementById('progressWrap').style.display = 'none';
+}
+
+// ─── LOG ─────────────────────────────────────────────────────────────────────
+function log(msg, type='info') {
+  const panel = document.getElementById('logPanel');
+  panel.style.display = 'block';
+  const d = document.createElement('div');
+  d.className = 'log-line ' + type;
+  const now = new Date();
+  d.innerHTML = `<span class="ts">[${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}]</span><span class="msg">${msg}</span>`;
+  panel.appendChild(d);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+// ─── SECTION COLLAPSE ────────────────────────────────────────────────────────
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function fmtTime(sec) {
+  sec = Math.floor(sec);
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = sec%60;
+  return `${h}:${pad(m)}:${pad(s)}`;
+}
+function parseTime(str) {
+  const p = str.split(':').map(Number);
+  if (p.length === 3) return p[0]*3600 + p[1]*60 + p[2];
+  if (p.length === 2) return p[0]*60 + p[1];
+  return p[0] || 0;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+// Init
+updateDlConfig();
+</script>
+</body>
+</html>
